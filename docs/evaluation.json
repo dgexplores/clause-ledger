@@ -1,0 +1,98 @@
+{
+  "scope": "Six authored deterministic extraction/rule fixtures, including three UI examples. Not an independent semantic extraction benchmark.",
+  "passed": 6,
+  "cases": 6,
+  "details": [
+    {
+      "case": "balanced",
+      "expected_counts": [
+        5,
+        0,
+        0
+      ],
+      "actual_counts": [
+        5,
+        0,
+        0
+      ],
+      "passed": true,
+      "exact_evidence_valid": true
+    },
+    {
+      "case": "exceptions",
+      "expected_counts": [
+        1,
+        3,
+        1
+      ],
+      "actual_counts": [
+        1,
+        3,
+        1
+      ],
+      "passed": true,
+      "exact_evidence_valid": true
+    },
+    {
+      "case": "conflict",
+      "expected_counts": [
+        4,
+        1,
+        0
+      ],
+      "actual_counts": [
+        4,
+        1,
+        0
+      ],
+      "passed": true,
+      "exact_evidence_valid": true
+    },
+    {
+      "case": "alternate-supported-payment",
+      "expected_counts": [
+        1,
+        0,
+        4
+      ],
+      "actual_counts": [
+        1,
+        0,
+        4
+      ],
+      "passed": true,
+      "exact_evidence_valid": true
+    },
+    {
+      "case": "unsupported-wording",
+      "expected_counts": [
+        0,
+        0,
+        5
+      ],
+      "actual_counts": [
+        0,
+        0,
+        5
+      ],
+      "passed": true,
+      "exact_evidence_valid": true
+    },
+    {
+      "case": "invalid-availability",
+      "expected_counts": [
+        0,
+        1,
+        4
+      ],
+      "actual_counts": [
+        0,
+        1,
+        4
+      ],
+      "passed": true,
+      "exact_evidence_valid": true
+    }
+  ],
+  "limitations": "Narrow supported patterns; no OCR, LLM, legal adequacy, or real-contract accuracy evaluation."
+}
