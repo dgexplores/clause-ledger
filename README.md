@@ -4,6 +4,8 @@
 
 Paste text or upload a text-based PDF. Every recognized finding points to the exact source passage and page. Conflicting values are flagged rather than silently selecting a favourable clause. A reviewer can approve, request changes, or reject, with a versioned audit event.
 
+**[Open the live review desk](https://dg-clause-ledger.onrender.com)** · [API reference](https://dg-clause-ledger.onrender.com/docs). Free hosting may take time to wake after inactivity. Use fictional samples; storage is ephemeral.
+
 ![Review desk](docs/review-desk.png)
 
 ## What problem does this solve?
@@ -50,6 +52,7 @@ flowchart LR
 - **Implemented:** text/PDF ingestion, source offsets/page citations, configurable thresholds, conflicting-value detection, session isolation, review history, stale-update rejection and per-session quotas.
 - **Default engine:** deterministic patterns. This is not LLM inference or a trained semantic extraction model. No model accuracy is claimed.
 - **Missing wording:** means no supported phrase was recognized; it does not prove the clause is absent. A passing rule does not establish legal adequacy.
+- **Negation:** obvious negative words on the same source line flag a finding for attention. This conservative heuristic may overflag unrelated wording and is not general semantic interpretation.
 - **PDF boundary:** at most 1 MiB, ten pages and 50,000 extracted characters. Parsing runs in a bounded subprocess with a wall deadline and POSIX limits where supported. Scanned PDFs need OCR, which is not implemented.
 - **Identity:** a random HttpOnly browser session separates demo records. Reviewer names are self-declared aliases, not authenticated enterprise identities.
 - **Storage:** SQLite survives app recreation when `CLAUSE_DB` points to a retained file. Default/free-hosting storage is ephemeral. Do not upload sensitive documents to the public demonstration.
@@ -64,11 +67,11 @@ ruff check clause_ledger tests
 python -m clause_ledger.evaluate --check
 ```
 
-Tests cover actual review transitions, cross-session access, source evidence, policy changes, conflicting values, invalid and oversized PDFs, restart persistence and quotas. [Evaluation](docs/evaluation.json) reports agreement on six authored rule fixtures. Three fixtures are also UI examples; this is a regression check, not an independent NLP benchmark.
+The 12 tests cover actual review transitions, cross-session access, exact evidence, policy changes, conflicting values, negation warnings, a valid two-page PDF, invalid/oversized/encrypted/over-page-limit PDFs, restart persistence, quotas, expiry, and concurrent stale-update rejection. [Evaluation](docs/evaluation.json) reports agreement on six authored rule fixtures. Three fixtures are also UI examples; this is a regression check, not an independent NLP benchmark.
 
 ## Deployment
 
-`render.yaml` defines a free Python service. `COOKIE_SECURE=true` is set for HTTPS deployment. For local HTTP, leave it unset. `Dockerfile` runs the same API. A live demo URL is published only after a successful hosted smoke test.
+`render.yaml` defines a free Python service. `COOKIE_SECURE=true` is set for HTTPS deployment. For local HTTP, leave it unset. `Dockerfile` runs the same API. Hosted smoke verification covers pages/assets, conflict detection, cross-session isolation, human review/version history, stale-update refusal, and deleting the verifier's own synthetic review.
 
 ## Ownership and interview topics
 

@@ -43,7 +43,8 @@ class Storage:
 
     def get(self, owner, identifier):
         with self.connect() as conn:
-            row = conn.execute("SELECT * FROM documents WHERE id=? AND owner=?", (identifier, owner)).fetchone()
+            cutoff = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()
+            row = conn.execute("SELECT * FROM documents WHERE id=? AND owner=? AND created_at>=?", (identifier, owner, cutoff)).fetchone()
             if row is None:
                 return None
             data = dict(row)
@@ -55,12 +56,14 @@ class Storage:
 
     def listing(self, owner):
         with self.connect() as conn:
-            return [dict(row) for row in conn.execute("SELECT id,title,created_at,status,version FROM documents WHERE owner=? ORDER BY created_at DESC", (owner,))]
+            cutoff = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()
+            return [dict(row) for row in conn.execute("SELECT id,title,created_at,status,version FROM documents WHERE owner=? AND created_at>=? ORDER BY created_at DESC", (owner, cutoff))]
 
     def review(self, owner, identifier, payload):
         with self.connect() as conn:
             conn.execute("BEGIN IMMEDIATE")
-            row = conn.execute("SELECT version FROM documents WHERE id=? AND owner=?", (identifier, owner)).fetchone()
+            cutoff = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()
+            row = conn.execute("SELECT version FROM documents WHERE id=? AND owner=? AND created_at>=?", (identifier, owner, cutoff)).fetchone()
             if row is None:
                 raise KeyError(identifier)
             if row["version"] != payload.expected_version:

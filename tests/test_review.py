@@ -90,3 +90,100 @@ def test_demo_session_quota(tmp_path):
         for i in range(20):
             assert client.post("/api/documents", json={"title": str(i), "text": SAMPLES[0]["text"]}).status_code == 201
         assert client.post("/api/documents", json={"title": "overflow", "text": SAMPLES[0]["text"]}).status_code == 429
+
+
+def text_pdf(pages):
+    """Create a real searchable PDF fixture without an external generator."""
+    from pypdf.generic import DictionaryObject, NameObject, DecodedStreamObject
+    writer = PdfWriter()
+    for text in pages:
+        page = writer.add_blank_page(width=612, height=792)
+        font = DictionaryObject({NameObject('/Type'): NameObject('/Font'), NameObject('/Subtype'): NameObject('/Type1'), NameObject('/BaseFont'): NameObject('/Helvetica')})
+        page[NameObject('/Resources')] = DictionaryObject({NameObject('/Font'): DictionaryObject({NameObject('/F1'): writer._add_object(font)})})
+        stream = DecodedStreamObject()
+        commands = ['BT /F1 11 Tf 50 750 Td']
+        for line in text.splitlines():
+            escaped = line.replace('\\', '\\\\').replace('(', '\\(').replace(')', '\\)')
+            commands.append(f'({escaped}) Tj 0 -16 Td')
+        commands.append('ET')
+        stream.set_data('\n'.join(commands).encode('latin-1'))
+        page[NameObject('/Contents')] = writer._add_object(stream)
+    output = io.BytesIO()
+    writer.write(output)
+    return output.getvalue()
+
+
+def test_positive_pdf_upload_preserves_page_and_evidence(tmp_path):
+    pages = ["Fictional supplier agreement.\nPayment terms: NET 45 days.\nUptime commitment: 99.9%.",
+             "Breach notification: within 48 hours.\nThe customer may terminate on notice.\nThe customer may audit service records."]
+    with TestClient(create_app(tmp_path / 'pdf.db')) as client:
+        response = client.post('/api/documents/pdf', data={'title': 'Searchable two-page PDF'}, files={'file': ('supplier.pdf', text_pdf(pages), 'application/pdf')})
+        assert response.status_code == 201, response.text
+        document = response.json()
+        assert len(document['pages']) == 2
+        assert document['report']['counts']['clear'] == 5
+        audit = next(item for item in document['report']['findings'] if item['key'] == 'audit')
+        assert audit['evidence'][0]['page'] == 2
+        for finding in document['report']['findings']:
+            for evidence in finding['evidence']:
+                assert document['pages'][evidence['page']-1][evidence['start']:evidence['end']] == evidence['quote']
+
+
+def test_pdf_page_limit_and_encrypted_pdf(tmp_path):
+    from pypdf import PdfReader
+    raw = text_pdf(['Fictional supplier document with enough text to analyze.'] * 11)
+    writer = PdfWriter()
+    writer.append(PdfReader(io.BytesIO(text_pdf(['Fictional supplier agreement for encryption test.']))))
+    writer.encrypt('fixture-password')
+    output = io.BytesIO()
+    writer.write(output)
+    with TestClient(create_app(tmp_path / 'limits.db')) as client:
+        for content in (raw, output.getvalue()):
+            response = client.post('/api/documents/pdf', data={'title': 'Rejected PDF'}, files={'file': ('supplier.pdf', content, 'application/pdf')})
+            assert response.status_code == 422
+
+
+def test_concurrent_review_writers_cannot_overwrite_same_version(tmp_path):
+    from concurrent.futures import ThreadPoolExecutor
+    from clause_ledger.models import ReviewInput
+    from clause_ledger.storage import Storage
+    store = Storage(tmp_path / 'race.db')
+    report = analyze([SAMPLES[0]['text']], Policy())
+    document = store.create('owner', 'Concurrent review', [SAMPLES[0]['text']], report)
+    payload = ReviewInput(decision='approved', reviewer='Reviewer', note='Reviewed the evidence.', expected_version=1)
+    def attempt(_):
+        try:
+            store.review('owner', document['id'], payload)
+            return 'saved'
+        except ValueError:
+            return 'stale'
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        assert sorted(pool.map(attempt, range(2))) == ['saved', 'stale']
+    assert len(store.get('owner', document['id'])['events']) == 1
+
+
+def test_expired_records_cannot_be_read_or_reviewed(tmp_path):
+    from datetime import datetime, timezone, timedelta
+    from clause_ledger.models import ReviewInput
+    from clause_ledger.storage import Storage
+    store = Storage(tmp_path / 'expired.db')
+    document = store.create('owner', 'Expired review', [SAMPLES[0]['text']], analyze([SAMPLES[0]['text']], Policy()))
+    with store.connect() as connection:
+        connection.execute('UPDATE documents SET created_at=? WHERE id=?', ((datetime.now(timezone.utc)-timedelta(hours=25)).isoformat(), document['id']))
+    assert store.get('owner', document['id']) is None
+    assert store.listing('owner') == []
+    payload = ReviewInput(decision='approved', reviewer='Reviewer', note='An outdated review.', expected_version=1)
+    try:
+        store.review('owner', document['id'], payload)
+    except KeyError:
+        pass
+    else:
+        raise AssertionError('Expired records must not accept a decision')
+
+
+def test_explicit_negation_is_never_marked_clear():
+    report = analyze(['No customer may audit operational records.\nPayment terms: NET 30 days are not accepted.'], Policy())
+    findings = {finding['key']: finding for finding in report['findings']}
+    assert findings['audit']['state'] == 'attention'
+    assert findings['payment_days']['state'] == 'attention'
+    assert findings['audit']['negation_flag'] is True

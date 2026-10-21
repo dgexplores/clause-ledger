@@ -20,11 +20,18 @@ def analyze(pages: list[str], policy: Policy) -> dict:
             for match in pattern.finditer(page):
                 start, end = match.span()
                 value = float(match.group(1)) if name == "uptime_percent" else int(match.group(1)) if name.endswith(("days", "hours")) else True
-                matches.append({"value": value, "page": number, "start": start, "end": end, "quote": page[start:end]})
+                line_start = page.rfind("\n", 0, start) + 1
+                line_end = page.find("\n", end)
+                context = page[line_start:line_end if line_end != -1 else len(page)]
+                # A narrow lexical baseline must not silently approve a match
+                # embedded in an explicitly negative sentence. This cautious
+                # flag is not a general negation/semantic understanding claim.
+                negated = bool(re.search(r"\b(?:no|not|never|without|neither|excluded|unavailable)\b", context, re.I))
+                matches.append({"value": value, "page": number, "start": start, "end": end, "quote": page[start:end], "negation_flag": negated})
         # Ambiguous clauses never silently select the most favourable value.
         values = {str(match["value"]) for match in matches}
         fields[name] = {"value": matches[0]["value"] if len(values) == 1 else None,
-                        "ambiguous": len(values) > 1, "evidence": matches}
+                        "ambiguous": len(values) > 1, "negation_flag": any(item["negation_flag"] for item in matches), "evidence": matches}
     definitions = [
         ("payment_days", "Payment window", f"At most {policy.max_payment_days} days", lambda v: v <= policy.max_payment_days, True),
         ("breach_hours", "Breach notification", f"At most {policy.max_breach_hours} hours", lambda v: v <= policy.max_breach_hours, True),
@@ -39,6 +46,8 @@ def analyze(pages: list[str], policy: Policy) -> dict:
             state, reason = "not_required", "Disabled in the submitted policy."
         elif field["ambiguous"]:
             state, reason = "attention", "Conflicting values were found; resolve the clauses manually."
+        elif field["negation_flag"]:
+            state, reason = "attention", "Potential negation appears on the same source line. A reviewer must interpret the clause."
         elif field["value"] is None:
             state, reason = "missing", "No supported wording found. Inspect the original document; the clause may use another form."
         elif not check(field["value"]):
