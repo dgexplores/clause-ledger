@@ -4,7 +4,7 @@
 
 Paste text or upload a text-based PDF. Every recognized finding points to the exact source passage and page. Conflicting values are flagged rather than silently selecting a favourable clause. A reviewer can approve, request changes, or reject, with a versioned audit event.
 
-**[Open the live review desk](https://dg-clause-ledger.onrender.com)** · [API reference](https://dg-clause-ledger.onrender.com/docs). Free hosting may take time to wake after inactivity. Use fictional samples; storage is ephemeral.
+**Rebuild status:** this upgraded version is local and tested. The earlier hosted demo is not verification of these changes. No live provider evaluation or new deployment has been performed.
 
 ![Review desk](docs/review-desk.png)
 
@@ -50,7 +50,7 @@ flowchart LR
 ## What is implemented, and what is not?
 
 - **Implemented:** text/PDF ingestion, source offsets/page citations, configurable thresholds, conflicting-value detection, session isolation, review history, stale-update rejection and per-session quotas.
-- **Default engine:** deterministic patterns. This is not LLM inference or a trained semantic extraction model. No model accuracy is claimed.
+- **Default engine:** deterministic patterns, without external calls. Optional semantic mode uses a configured OpenAI-compatible provider and validates its output locally. No model accuracy is claimed.
 - **Missing wording:** means no supported phrase was recognized; it does not prove the clause is absent. A passing rule does not establish legal adequacy.
 - **Negation:** obvious negative words on the same source line flag a finding for attention. This conservative heuristic may overflag unrelated wording and is not general semantic interpretation.
 - **PDF boundary:** at most 1 MiB, ten pages and 50,000 extracted characters. Parsing runs in a bounded subprocess with a wall deadline and POSIX limits where supported. Scanned PDFs need OCR, which is not implemented.
@@ -84,3 +84,11 @@ Skills demonstrated: Python, REST APIs, structured text processing, SQL persiste
 ## Original project study
 
 See the [upstream project study](docs/upstream-study.md) for the original architecture, authorship, setup requirements and limitations. It describes a separate upstream reference, not this repository’s deployed application.
+
+## Optional source-checked AI extraction
+
+Set `CLAUSE_LLM_API_KEY` and `CLAUSE_LLM_MODEL` on the server. Optionally set `CLAUSE_LLM_BASE_URL` (default `https://api.openai.com/v1`; HTTPS required except localhost). Restart the server, then explicitly choose configured AI extraction in the form or send `engine: "semantic"` in the text API. The PDF endpoint accepts the same form field. Selecting this mode sends document text to the configured provider and can incur charges. Never put keys in the browser or repository.
+
+The provider proposes five typed fields. Every quote must be a unique exact substring of its cited page, and numeric values must occur in that quote. Duplicate keys, invented quotes, invalid pages, unsupported types and malformed responses fail without saving a review. Local code applies the policy; the model never approves a contract. Potential negation and uncalibrated confidence below 0.8 force attention. Quote completeness and semantic interpretation are not proven by string matching; all results require review.
+
+Provider-boundary tests use HTTP mock transports: valid evidence, invented values/quotes, invalid pages and confidence, boolean confusion, negation, redacted outage errors and unconfigured requests. These demonstrate validation behavior, not real-provider quality or an improvement over VendorGuard. The source study remains credited; this is an independently implemented Python application.

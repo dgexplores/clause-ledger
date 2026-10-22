@@ -1,4 +1,4 @@
-"""HTTP boundary. No provider keys, external tool execution, or legal decisions."""
+"""HTTP boundary with optional explicit provider extraction; no legal decisions."""
 import asyncio
 from contextlib import asynccontextmanager
 import hashlib
@@ -18,6 +18,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError
 
 from .analysis import analyze
+from .semantic import ProviderError, analyze_semantic, configured
 from .models import DocumentInput, Policy, ReviewInput
 from .samples import SAMPLES
 from .storage import Storage
@@ -107,7 +108,7 @@ def create_app(database_path=None):
 
     @app.get("/healthz")
     def health():
-        return {"status": "ok", "engine": "deterministic-extraction.v1", "llm_enabled": False,
+        return {"status": "ok", "engine": "deterministic-extraction.v1", "llm_enabled": configured(),
                 "storage": "persistent" if database_path or os.getenv("CLAUSE_DB") else "ephemeral-demo"}
 
     @app.get("/api/samples")
@@ -118,9 +119,12 @@ def create_app(database_path=None):
     def listing(request: Request):
         return request.app.state.store.listing(request.state.owner)
 
-    def save(request, title, pages, policy):
+    def save(request, title, pages, policy, engine="deterministic"):
         try:
-            return request.app.state.store.create(request.state.owner, title.strip(), pages, analyze(pages, policy))
+            report = analyze_semantic(pages, policy) if engine == "semantic" else analyze(pages, policy)
+            return request.app.state.store.create(request.state.owner, title.strip(), pages, report)
+        except ProviderError as error:
+            raise HTTPException(502 if configured() else 503, str(error)) from error
         except OverflowError as error:
             raise HTTPException(429, str(error)) from error
 
@@ -128,10 +132,12 @@ def create_app(database_path=None):
     def create_document(payload: DocumentInput, request: Request):
         if not payload.title.strip() or len(payload.text.strip()) < 30:
             raise HTTPException(422, "Add a title and at least 30 characters of document text")
-        return save(request, payload.title, [payload.text], payload.policy)
+        return save(request, payload.title, [payload.text], payload.policy, payload.engine)
 
     @app.post("/api/documents/pdf", status_code=201)
-    async def create_pdf(request: Request, file: UploadFile = File(...), title: str = Form(...), policy: str = Form("{}")):
+    async def create_pdf(request: Request, file: UploadFile = File(...), title: str = Form(...), policy: str = Form("{}"), engine: str = Form("deterministic")):
+        if engine not in {"deterministic", "semantic"}:
+            raise HTTPException(422, "Unsupported extraction engine")
         if not 1 <= len(title.strip()) <= 120:
             raise HTTPException(422, "Title must contain 1 to 120 characters")
         raw = await file.read(1024 * 1024 + 1)
@@ -152,7 +158,7 @@ def create_app(database_path=None):
             raise HTTPException(422, "PDF parsing exceeded its limit. Paste the text instead.")
         if result.returncode or "error" in parsed:
             raise HTTPException(422, parsed.get("error", "PDF could not be parsed"))
-        return save(request, title, parsed["pages"], selected)
+        return await asyncio.to_thread(save, request, title, parsed["pages"], selected, engine)
 
     @app.get("/api/documents/{identifier}")
     def get_document(identifier: str, request: Request):

@@ -13,6 +13,7 @@ class Policy(BaseModel):
 
 class DocumentInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
+    engine: Literal["deterministic", "semantic"] = "deterministic"
     title: str = Field(min_length=1, max_length=120)
     text: str = Field(min_length=30, max_length=50000)
     policy: Policy = Field(default_factory=Policy)
