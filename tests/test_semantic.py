@@ -26,7 +26,8 @@ def test_exact_quote_and_local_policy(monkeypatch):
 def test_rejects_hallucinated_or_invalid_evidence(monkeypatch,change):
     quote='Invoices shall be settled in 90 days.'
     field={'key':'payment_days','value':90,'page':1,'quote':quote,'confidence':0.95,**change}
-    with pytest.raises(ProviderError):analyze_semantic([quote],Policy(),provider(monkeypatch,[field]))
+    with pytest.raises(ProviderError):
+        analyze_semantic([quote],Policy(),provider(monkeypatch,[field]))
 
 
 def test_negation_and_confidence_never_auto_clear(monkeypatch):
@@ -47,7 +48,8 @@ def test_unconfigured_semantic_does_not_save(monkeypatch,tmp_path):
 def test_provider_failure_redacts_body(monkeypatch):
     provider(monkeypatch,[])
     transport=httpx.MockTransport(lambda request:httpx.Response(401,text='secret-key-should-not-leak'))
-    with pytest.raises(ProviderError) as error:analyze_semantic(['source'],Policy(),transport)
+    with pytest.raises(ProviderError) as error:
+        analyze_semantic(['source'],Policy(),transport)
     assert 'secret-key' not in str(error.value)
 
 
