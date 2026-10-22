@@ -4,7 +4,7 @@
 
 Paste text or upload a text-based PDF. Every recognized finding points to the exact source passage and page. Conflicting values are flagged rather than silently selecting a favourable clause. A reviewer can approve, request changes, or reject, with a versioned audit event.
 
-**Rebuild status:** this upgraded version is local and tested. The earlier hosted demo is not verification of these changes. No live provider evaluation or new deployment has been performed.
+**Rebuild status:** independent Python application with an offline demonstration and optional configured model extraction. Provider-boundary tests use mocks; no live model-quality evaluation is claimed.
 
 ![Review desk](docs/review-desk.png)
 
@@ -94,3 +94,7 @@ The provider proposes five typed fields. Every quote must be a unique exact subs
 Provider-boundary tests use HTTP mock transports: valid evidence, invented values/quotes, invalid pages and confidence, boolean confusion, negation, redacted outage errors and unconfigured requests. These demonstrate validation behavior, not real-provider quality or an improvement over VendorGuard. The source study remains credited; this is an independently implemented Python application.
 
 AI requests without the operator token are rejected before the provider is called. The browser clears the token after each analysis request and never stores it in localStorage. This shared token is a bounded portfolio control, not enterprise authentication; production still needs authenticated users, per-user authorization and rate limits.
+
+## Demo and interview walkthrough
+
+[Open the demo](https://dg-clause-ledger.onrender.com) · [Five-minute walkthrough](docs/DEMO.md). Free hosting can sleep; instance-local demo records may reset. External-provider and Jira modes are disabled unless configured and authorized.
