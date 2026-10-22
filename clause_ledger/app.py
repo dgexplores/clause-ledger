@@ -124,7 +124,7 @@ def create_app(database_path=None):
             if not configured():
                 raise HTTPException(503, "Semantic extraction is not configured")
             access_token = os.getenv("CLAUSE_LLM_ACCESS_TOKEN", "")
-            if not access_token or not secrets.compare_digest(request.headers.get("x-ai-token", ""), access_token):
+            if not access_token or not secrets.compare_digest(request.headers.get("x-ai-token", "").encode(), access_token.encode()):
                 raise HTTPException(403, "An operator AI access token is required")
         try:
             report = analyze_semantic(pages, policy) if engine == "semantic" else analyze(pages, policy)
