@@ -9,6 +9,7 @@ import httpx
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, ValidationError
 
 from .models import Policy
+from .analysis import analyze
 
 
 class ProviderError(Exception):
@@ -75,15 +76,19 @@ def analyze_semantic(pages: list[str], policy: Policy, transport=None):
         elif not isinstance(item.value, bool):
             raise ProviderError("Termination and audit values must be booleans")
         start = page.index(item.quote)
+        line_start = page.rfind("\n", 0, start) + 1
+        line_end = page.find("\n", start + len(item.quote))
+        source_context = page[line_start:line_end if line_end != -1 else len(page)]
         extracted[item.key] = {"value": item.value, "confidence": item.confidence,
             "evidence": [{"value": item.value, "page": item.page, "start": start, "end": start + len(item.quote), "quote": item.quote}],
-            "negation_flag": bool(re.search(r"\b(?:no|not|never|without|neither|excluded|unavailable)\b", item.quote, re.I))}
+            "negation_flag": bool(re.search(r"\b(?:no|not|never|without|neither|excluded|unavailable)\b", source_context, re.I))}
     definitions = [
         ("payment_days", "Payment window", f"At most {policy.max_payment_days} days", lambda v: v <= policy.max_payment_days, True),
         ("breach_hours", "Breach notification", f"At most {policy.max_breach_hours} hours", lambda v: v <= policy.max_breach_hours, True),
         ("uptime_percent", "Availability commitment", f"At least {policy.min_uptime_percent:g}% uptime", lambda v: v >= policy.min_uptime_percent, True),
         ("termination", "Termination wording", "Explicit customer/either-party termination wording", bool, policy.require_termination),
         ("audit", "Audit wording", "Explicit customer audit wording", bool, policy.require_audit)]
+    baseline = {field["key"]: field for field in analyze(pages, policy)["findings"]}
     findings = []
     for key, label, target, check, required in definitions:
         field = extracted.get(key, {"value": None, "confidence": None, "evidence": [], "negation_flag": False})
@@ -91,13 +96,15 @@ def analyze_semantic(pages: list[str], policy: Policy, transport=None):
             state, reason = "not_required", "Disabled in the submitted policy."
         elif field["value"] is None:
             state, reason = "missing", "Provider did not resolve this field; inspect the source manually."
+        elif baseline[key]["ambiguous"]:
+            state, reason = "attention", "Offline extraction found conflicting values; a model proposal cannot silently resolve them."
         elif field["negation_flag"] or field["confidence"] < 0.8:
             state, reason = "attention", "Potential negation or low model confidence requires manual interpretation."
         elif not check(field["value"]):
             state, reason = "attention", "Extracted value falls outside the locally applied policy."
         else:
             state, reason = "clear", "Source-backed extraction matches the numerical/boolean policy; human review is still required."
-        findings.append({"key": key, "label": label, "target": target, "state": state, "reason": reason, "ambiguous": False, **field})
+        findings.append({"key": key, "label": label, "target": target, "state": state, "reason": reason, "ambiguous": baseline[key]["ambiguous"], **field})
     return {"engine": "provider-extraction.v1", "model": os.environ["CLAUSE_LLM_MODEL"], "policy": policy.model_dump(), "findings": findings,
             "counts": {s: sum(f["state"] == s for f in findings) for s in ("clear", "attention", "missing", "not_required")},
             "requires_review": True, "limitations": "Quotes and numeric evidence are mechanically checked; semantic correctness and quote completeness are not proven. Confidence is uncalibrated. No autonomous approval, OCR or legal judgment."}

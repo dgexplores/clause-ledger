@@ -67,7 +67,7 @@ ruff check clause_ledger tests
 python -m clause_ledger.evaluate --check
 ```
 
-The 12 tests cover actual review transitions, cross-session access, exact evidence, policy changes, conflicting values, negation warnings, a valid two-page PDF, invalid/oversized/encrypted/over-page-limit PDFs, restart persistence, quotas, expiry, and concurrent stale-update rejection. [Evaluation](docs/evaluation.json) reports agreement on six authored rule fixtures. Three fixtures are also UI examples; this is a regression check, not an independent NLP benchmark.
+Twenty-five local tests pass. The original twelve cover actual review transitions, cross-session access, exact evidence, policy changes, conflicting values, negation warnings, a valid two-page PDF, invalid/oversized/encrypted/over-page-limit PDFs, restart persistence, quotas, expiry, and concurrent stale-update rejection. [Evaluation](docs/evaluation.json) reports agreement on six authored rule fixtures. Three fixtures are also UI examples; this is a regression check, not an independent NLP benchmark.
 
 ## Deployment
 
@@ -87,8 +87,10 @@ See the [upstream project study](docs/upstream-study.md) for the original archit
 
 ## Optional source-checked AI extraction
 
-Set `CLAUSE_LLM_API_KEY` and `CLAUSE_LLM_MODEL` on the server. Optionally set `CLAUSE_LLM_BASE_URL` (default `https://api.openai.com/v1`; HTTPS required except localhost). Restart the server, then explicitly choose configured AI extraction in the form or send `engine: "semantic"` in the text API. The PDF endpoint accepts the same form field. Selecting this mode sends document text to the configured provider and can incur charges. Never put keys in the browser or repository.
+Set `CLAUSE_LLM_API_KEY`, `CLAUSE_LLM_MODEL` and a long random `CLAUSE_LLM_ACCESS_TOKEN` on the server. Optionally set `CLAUSE_LLM_BASE_URL` (default `https://api.openai.com/v1`; HTTPS required except localhost). Restart the server, enter the operator access token in the password field (or use the `X-AI-Token` API header), then explicitly choose configured AI extraction in the form or send `engine: "semantic"` in the text API. The PDF endpoint accepts the same form field. Selecting this mode sends document text to the configured provider and can incur charges. Never put keys in the browser or repository.
 
-The provider proposes five typed fields. Every quote must be a unique exact substring of its cited page, and numeric values must occur in that quote. Duplicate keys, invented quotes, invalid pages, unsupported types and malformed responses fail without saving a review. Local code applies the policy; the model never approves a contract. Potential negation and uncalibrated confidence below 0.8 force attention. Quote completeness and semantic interpretation are not proven by string matching; all results require review.
+The provider proposes five typed fields. Every quote must be a unique exact substring of its cited page, and numeric values must occur in that quote. Duplicate keys, invented quotes, invalid pages, unsupported types and malformed responses fail without saving a review. Local code applies the policy; the model never approves a contract. Known conflicting values from the offline extractor, same-line negation (even outside a truncated quote), and uncalibrated confidence below 0.8 force attention. Quote completeness and semantic interpretation are not proven by string matching; all results require review.
 
 Provider-boundary tests use HTTP mock transports: valid evidence, invented values/quotes, invalid pages and confidence, boolean confusion, negation, redacted outage errors and unconfigured requests. These demonstrate validation behavior, not real-provider quality or an improvement over VendorGuard. The source study remains credited; this is an independently implemented Python application.
+
+AI requests without the operator token are rejected before the provider is called. The browser clears the token after each analysis request and never stores it in localStorage. This shared token is a bounded portfolio control, not enterprise authentication; production still needs authenticated users, per-user authorization and rate limits.

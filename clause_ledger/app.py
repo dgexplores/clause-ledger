@@ -108,7 +108,7 @@ def create_app(database_path=None):
 
     @app.get("/healthz")
     def health():
-        return {"status": "ok", "engine": "deterministic-extraction.v1", "llm_enabled": configured(),
+        return {"status": "ok", "engine": "deterministic-extraction.v1", "llm_enabled": bool(configured() and os.getenv("CLAUSE_LLM_ACCESS_TOKEN")),
                 "storage": "persistent" if database_path or os.getenv("CLAUSE_DB") else "ephemeral-demo"}
 
     @app.get("/api/samples")
@@ -120,6 +120,12 @@ def create_app(database_path=None):
         return request.app.state.store.listing(request.state.owner)
 
     def save(request, title, pages, policy, engine="deterministic"):
+        if engine == "semantic":
+            if not configured():
+                raise HTTPException(503, "Semantic extraction is not configured")
+            access_token = os.getenv("CLAUSE_LLM_ACCESS_TOKEN", "")
+            if not access_token or not secrets.compare_digest(request.headers.get("x-ai-token", ""), access_token):
+                raise HTTPException(403, "An operator AI access token is required")
         try:
             report = analyze_semantic(pages, policy) if engine == "semantic" else analyze(pages, policy)
             return request.app.state.store.create(request.state.owner, title.strip(), pages, report)
