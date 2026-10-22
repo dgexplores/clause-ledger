@@ -54,7 +54,7 @@ Renaming and README editing do not establish implementation experience, benchmar
 
 ## Attribution and reuse
 
-Original source: [VendorGuard](https://github.com/experienceswithanishh/vendorguard-copilot-studio). Original authors: Anish / Processary Consulting. Upstream history and notices are retained.
+Original source: [VendorGuard](https://github.com/experienceswithanishh/vendorguard-copilot-studio). Original authors: Anish / Processary Consulting. Upstream authorship and applicable notices are recorded here; the upstream source is not included in this repository.
 
 No clear reuse licence was found. The upstream License heading identifies the hackathon but does not provide a reuse grant. This is a local reference copy; public redistribution needs appropriate permission.
 
@@ -62,4 +62,4 @@ No clear reuse licence was found. The upstream License heading identifies the ha
 
 ## Relationship to this repository
 
-This document describes the original upstream reference, not the application deployed from this repository. Only study documentation is published here; the cloned upstream source stays local. Use the [repository README](../README.md) for the current application, live demo, tests and contribution details.
+This document describes the original upstream reference, not the application deployed from this repository. Only study documentation is published here; the upstream source is not included in this repository. Use the [repository README](../README.md) for the current application, live demo, tests and contribution details.
