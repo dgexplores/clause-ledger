@@ -80,3 +80,7 @@ Original implementation for Deepak Gangwar's portfolio, developed with AI assist
 Useful technical discussion: when deterministic extraction is preferable to model generation; evidence spans versus summaries; atomic version checks; browser-session isolation; input/resource limits; replacing the baseline with a separately evaluated semantic extractor.
 
 Skills demonstrated: Python, REST APIs, structured text processing, SQL persistence, validation, automation, testing, Git/CI, documentation and human-review workflow design. Source code uses the MIT [license](LICENSE).
+
+## Original project study
+
+See the [upstream project study](docs/upstream-study.md) for the original architecture, authorship, setup requirements and limitations. It describes a separate upstream reference, not this repository’s deployed application.
